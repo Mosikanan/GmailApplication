@@ -27,7 +27,7 @@ const Email = require('./emailModel');
 app.use(cors());
 
 sequelize
-  .sync({ alter: true,}) // Use `force: true` to reset the database during development
+  .sync({ alter: true,force: true}) // Use `force: true` to reset the database during development
   .then(() => console.log('Database synced.'))
   .catch((err) => console.error('Error syncing database:', err));
 
@@ -182,7 +182,7 @@ const getEmails = async () => {
             subject: headers.subject || 'No Subject', // Extract subject
             timestamp: '2012-10-21T08:59:28.000Z', // Use attributes.date for timestamp
             snippet: headers.snippet || 'No Snippet', // If there's a snippet available
-            userId: 1, // Set the appropriate userId if applicable
+            userId: null, // Set the appropriate userId if applicable
           };
       
           // Save email to the database

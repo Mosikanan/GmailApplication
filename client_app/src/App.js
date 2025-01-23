@@ -8,7 +8,8 @@ const EmailList = () => {
   const handleLogin = async () => {
     console.log('pressed')
     try {
-      
+      getAllMails();
+      // return;
       window.location.href = 'http://localhost:500/auth/google';
 
     } catch (error) {
