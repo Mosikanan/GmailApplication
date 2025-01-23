@@ -37,7 +37,8 @@ debug/
 
 # node.js
 #
-node_modules/
+server/node_modules/
+client_app/node_modules/
 npm-debug.log
 yarn-error.log
 yarn.lock
