@@ -16,17 +16,16 @@ const EmailList = () => {
     }
   };
 
-  // Fetch emails after the user logs in
-  useEffect(() => {
-    // Make sure user is authenticated before fetching emails
-    axios.get('http://localhost:5000/auth/google')
-      .then(response => setEmails(response.data))
-      .catch(error => console.error('Error fetching emails:', error));
-  }, []);
+  const getAllMails = () => {
+    axios.get('http://localhost:500/emails')
+    .then(response => 
+      console.log(response.data),)
+    .catch(error => console.error('Error fetching emails:', error));
+  };
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold">Emails</h1>
+      <h1 className="text-2xl font-bold">Get Emails</h1>
       {/* Show Login Button if not logged in */}
       <button 
         onClick={handleLogin} 

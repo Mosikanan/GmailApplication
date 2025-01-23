@@ -5,6 +5,9 @@ const mysql = require("mysql2");
 const { OAuth2Client } = require('google-auth-library'); 
 const path = require('path'); 
 const { google } = require('googleapis');
+// const emailRoutes = require('./emailRoutes'); // Import the email routes
+const router = express.Router();
+const cors = require('cors');
 
 
 dotenv.config();
@@ -21,9 +24,10 @@ const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 const sequelize = require('./db');
 const User = require('./userModel');
 const Email = require('./emailModel');
+app.use(cors());
 
 sequelize
-  .sync({ alter: true, }) // Use `force: true` to reset the database during development
+  .sync({ alter: true,}) // Use `force: true` to reset the database during development
   .then(() => console.log('Database synced.'))
   .catch((err) => console.error('Error syncing database:', err));
 
@@ -165,17 +169,31 @@ const getEmails = async () => {
       .then((messages) => {
         const emailData = messages.map((msg) => {
           console.log('messgesss', msg);
+          const headers = msg.parts?.body || {};
+          // const headers = msg.parts.find((part) => part.which === 'HEADER.FIELDS (FROM TO SUBJECT DATE)');
+          console.log('messgesss morrrrs',msg.attributes.uid);
 
-          const headers = msg.parts.find((part) => part.which === 'HEADER.FIELDS (FROM TO SUBJECT DATE)');
-          return {
-            from: headers.body.from,
-            to: headers.body.to ? headers.body.to : 'N/A',
-            subject: headers.body.subject,
-            date: headers.body.date,
+          const attributes = msg.attributes;
+      
+          const emailData = {
+            emailId: attributes['x-gm-msgid'], // Use x-gm-msgid as a unique email ID
+            senderEmail: headers.from || 'Unknown Sender', // Extract sender email
+            senderName: headers.from || 'Unknown Sender', // Optionally split sender email to extract the name
+            subject: headers.subject || 'No Subject', // Extract subject
+            timestamp: '2012-10-21T08:59:28.000Z', // Use attributes.date for timestamp
+            snippet: headers.snippet || 'No Snippet', // If there's a snippet available
+            userId: 1, // Set the appropriate userId if applicable
           };
-        });
+      
+          // Save email to the database
+         Email.create(emailData);
 
+          
+        });
+        
+ 
         resolve(emailData);
+
       })
       .catch((err) => {
         console.error('IMAP Connection Error:', err);
@@ -184,11 +202,29 @@ const getEmails = async () => {
   });
 };
 
+// Use the email routes
+// app.use('/apiSaved', emailRoutes);
+
+app.get('/emails', async (req, res) => {
+  try {
+    const emails = await Email.findAll({
+      attributes: ['emailId', 'senderEmail', 'senderName', 'subject', 'timestamp', 'snippet'],
+    });
+    res.status(200).json({ success: true, data: emails });
+    // console.log(emails);
+  } catch (error) {
+    console.error('Error fetching emails:', error);
+    res.status(500).json({ success: false, message: 'Error fetching emails' });
+  }
+});
+
 // API route to get emails
 app.get('/api/emails', async (req, res) => {
   try {
     const emails = await getEmails();
-    res.json(emails);
+    res.redirect('http://localhost:500/emails');
+
+    // res.json(emails);
   } catch (error) {
     console.error('Error fetching emails:', error);
     res.status(500).json({ message: error });

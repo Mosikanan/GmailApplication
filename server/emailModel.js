@@ -3,15 +3,11 @@ const sequelize = require('./db');
 const User = require('./userModel');
 
 const Email = sequelize.define('Email', {
-    emailId: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-    },
+    emailId: DataTypes.STRING,
     senderEmail: DataTypes.STRING,
     senderName: DataTypes.STRING,
     subject: DataTypes.TEXT,
-    timestamp: DataTypes.DATE,
+    timestamp: DataTypes.STRING,
     snippet: DataTypes.TEXT,
 });
 
