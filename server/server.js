@@ -1,9 +1,10 @@
-const express = require('express'); // Express is a web framework for Node.js, used to create server-side APIs, routes, and handle HTTP requests and responses efficiently.
-const Imap = require('imap-simple'); // IMAP Simple is used to interact with email servers using the IMAP protocol. It simplifies handling email operations, such as fetching or managing emails.
-const dotenv = require('dotenv'); // dotenv loads environment variables from a `.env` file into `process.env`. It helps in managing sensitive data like API keys and configurations securely.
-const mysql = require("mysql2"); // mysql2 is a library for connecting to MySQL databases. It supports both callback-based and promise-based queries for database operations.
-const { OAuth2Client } = require('google-auth-library'); // The Google Auth Library is used for OAuth 2.0 authentication. The `OAuth2Client` class facilitates handling OAuth flows, like verifying Google tokens.
-const path = require('path'); // path is a core Node.js module for working with file and directory paths. It helps in resolving and manipulating paths reliably across different operating systems.
+const express = require('express'); 
+const Imap = require('imap-simple'); 
+const dotenv = require('dotenv'); 
+const mysql = require("mysql2"); 
+const { OAuth2Client } = require('google-auth-library'); 
+const path = require('path'); 
+const { google } = require('googleapis');
 
 
 dotenv.config();
@@ -22,9 +23,9 @@ const User = require('./userModel');
 const Email = require('./emailModel');
 
 sequelize
-    .sync({ alter: true, }) // Use `force: true` to reset the database during development
-    .then(() => console.log('Database synced.'))
-    .catch((err) => console.error('Error syncing database:', err));
+  .sync({ alter: true, }) // Use `force: true` to reset the database during development
+  .then(() => console.log('Database synced.'))
+  .catch((err) => console.error('Error syncing database:', err));
 
 // MySQL connection
 const db = mysql.createConnection({
@@ -42,8 +43,8 @@ db.connect((err) => {
 app.post('/save-user', (req, res) => {
   const { email, name } = req.body;
   db.query('INSERT INTO users (email, name) VALUES x ,y)', [email, name], (err) => {
-      if (err) res.status(500).json({ error: err.message });
-      res.status(200).json({ message: 'User saved!' });
+    if (err) res.status(500).json({ error: err.message });
+    res.status(200).json({ message: 'User saved!' });
   });
 });
 
@@ -57,51 +58,63 @@ app.get('/auth/google', (req, res) => {
 
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
-
   try {
-    // Exchange the code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
-
-    // Retrieve the user's profile information from Google
-    const oauth2 = google.oauth2({
-      auth: oauth2Client,
-      version: 'v2',
-    });
-
-    const userInfo = await oauth2.userinfo.get();
-    const { email, name } = userInfo.data;
-
-    console.log('User Info:', userInfo.data);
     console.log('Access Tokens:', tokens);
 
-    // Save the user info and tokens into the database
-    const query = `
-      INSERT INTO users (email, name, access_token, refresh_token) 
-      VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE 
-      access_token = VALUES(access_token),
-      refresh_token = VALUES(refresh_token);
-    `;
+    // try {
+    //    // Step 4: Get user profile data
+    //        const oauth2 = google.oauth2({
+    //         version: 'v2',
+    //         auth: oauth2Client,
+    //       });
 
-    db.query(
-      query,
-      [email, name, tokens.access_token, tokens.refresh_token],
-      (err, results) => {
-        if (err) {
-          console.error('Error saving user to DB:', err);
-          return res.status(500).send('Database error');
-        }
+    //       // Fetch the user's profile info
+    //       const userInfo = await oauth2.userinfo.v2.me.get();
 
-        console.log('User saved/updated successfully:', results);
-        res.send('Authentication successful! You can now fetch emails.');
-      }
-    );
+    //       // Step 5: Display user data (or store it)
+    //       console.log('User Info:', userInfo.data);
+    //       return;
+    // } catch (error) {
+    //   console.log('error in ctch',error)
+    // }
+
+    // Store tokens securely in a database (not implemented here)
+    process.env.ACCESS_TOKEN = tokens.access_token;
+    process.env.REFRESH_TOKEN = tokens.refresh_token;
+
+    // const query = `
+    //   INSERT INTO users (email, name, access_token, refresh_token) 
+    //   VALUES (?, ?, ?, ?)
+    //   ON DUPLICATE KEY UPDATE 
+    //   access_token = VALUES(access_token),
+    //   refresh_token = VALUES(refresh_token);
+    // `;
+
+    // db.query(
+    //   query,
+    //   [email, name, tokens.access_token, tokens.refresh_token],
+    //   (err, results) => {
+    //     if (err) {
+    //       console.error('Error saving user to DB:', err);
+    //       return res.status(500).send('Database error');
+    //     }
+
+    //     console.log('User saved/updated successfully:', results);
+    //     res.send('Authentication successful! You can now fetch emails.');
+    //   }
+    // );
+    res.redirect('http://localhost:500/api/emails');
+
+    // res.send('Authentication successful! You can now fetch emails.');
+    
   } catch (error) {
-    console.error('Error during callback:', error);
+    console.error('Error retrieving access token:', error);
     res.status(400).send('Error retrieving access token');
   }
 });
+
 
 // Helper function to refresh access token
 const refreshAccessToken = async () => {
@@ -113,22 +126,22 @@ const refreshAccessToken = async () => {
 
 // Function to connect to Gmail IMAP and fetch emails
 const getEmails = async () => {
-  // let accessToken = process.env.ACCESS_TOKEN;
+  let accessToken = process.env.ACCESS_TOKEN;
 
   // Refresh token if needed
-  // if (!accessToken) {
+  if (!accessToken) {
     accessToken = await refreshAccessToken();
-  // }
+  }
 
   const imapConfig = {
     imap: {
-      user: 'unionjaffna@gmail.com', 
-      password: '754968675',
-
+      user: 'mosiknn@gmail.com',
+      // password: 'Kannaplease123456789',
+      password: 'nsto ynnj bqpx xnit',
       // xoauth2: Buffer.from(
-      //   `user=unionjaffna@gmail.com\x01auth=Bearer ${accessToken}\x01\x01`
+      //   `user=mosiknn@gmail.com\x01auth=Bearer ${accessToken}\x01\x01`
       // ).toString('base64'),
-      authTimeout: 3000,  
+      authTimeout: 3000,
       host: 'imap.gmail.com',
       port: 993,
       tls: true,
@@ -151,12 +164,14 @@ const getEmails = async () => {
       })
       .then((messages) => {
         const emailData = messages.map((msg) => {
+          console.log('messgesss', msg);
+
           const headers = msg.parts.find((part) => part.which === 'HEADER.FIELDS (FROM TO SUBJECT DATE)');
           return {
-            from: headers.body.from[0],
-            to: headers.body.to ? headers.body.to[0] : 'N/A',
-            subject: headers.body.subject[0],
-            date: headers.body.date[0],
+            from: headers.body.from,
+            to: headers.body.to ? headers.body.to : 'N/A',
+            subject: headers.body.subject,
+            date: headers.body.date,
           };
         });
 
