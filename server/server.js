@@ -2,7 +2,7 @@ const express = require('express');
 const Imap = require('imap-simple'); 
 const dotenv = require('dotenv'); 
 const mysql = require("mysql2"); 
-const { OAuth2Client } = require('google-auth-library'); 
+const { OAuth2Client,GoogleAuth, auth } = require('google-auth-library'); 
 const path = require('path'); 
 const { google } = require('googleapis');
 // const emailRoutes = require('./emailRoutes'); // Import the email routes
@@ -25,6 +25,7 @@ const sequelize = require('./db');
 const User = require('./userModel');
 const Email = require('./emailModel');
 app.use(cors());
+app.use(express.json()); // This is the crucial part to handle JSON request bodies
 
 sequelize
   .sync({ alter: true,force: true}) // Use `force: true` to reset the database during development
@@ -44,13 +45,6 @@ db.connect((err) => {
   else console.log("Connected to MySQL!");
 });
 
-app.post('/save-user', (req, res) => {
-  const { email, name } = req.body;
-  db.query('INSERT INTO users (email, name) VALUES x ,y)', [email, name], (err) => {
-    if (err) res.status(500).json({ error: err.message });
-    res.status(200).json({ message: 'User saved!' });
-  });
-});
 
 app.get('/auth/google', (req, res) => {
   const authUrl = oauth2Client.generateAuthUrl({
@@ -60,8 +54,86 @@ app.get('/auth/google', (req, res) => {
   res.redirect(authUrl);
 });
 
+app.post('/auth/googleLogin', async (req, res) => {
+  try {
+    console.log('Incoming request body:', req.body); // Check if the body is properly parsed
+    const { credential } = req.body; // Now you can access 'credential' from the body
+    console.log('Credential:', credential);
+    // const ticket = await oauth2Client.verifyIdToken({
+    //   idToken: credential.access_token,
+    //   audience: CLIENT_ID, // Your Google Client ID
+    // });
+
+    try {
+      // Make a request to the Google User Info endpoint
+      const response = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,  // Include the access token in the authorization header
+        },
+      });
+  
+      // The response will contain user info
+      console.log('User Info:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      throw new Error('Failed to get user info');
+    }
+    
+
+    // const payload = ticket.getPayload();
+  //  refresh_token: 1//0gyKLke34lX0-CgYIARAAGBASNwF-L9IrZRXJF00sD3fuspfIJodsTE7rS0NPKbgNJRDsOEPw06_J-HWQvwv4oaXUhdsZtcx8pcg
+//     const auth = new GoogleAuth();
+// const tokens = await auth.getAccessToken(credential)
+    // const { tokens } = await oauth2Client.getToken(credential); // This retrieves the access token
+    // oauth2Client.getToken(decodeURIComponent(credential), (err, token) => {
+    //   if (err) {
+    //     console.error('Error retrieving access token:', err);
+    //     return;
+    // }
+    // });
+    // console.log('ticket',ticket)
+
+    // const tokens = await oauth2Client.getToken('eyJhbGciOiJSUzI1NiIsImtpZCI6IjYzMzdiZTYzNjRmMzgyNDAwOGQwZTkwMDNmNTBiYjZiNDNkNWE5YzYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNDQwNDIzNDIyNzItaHM0ZzU4cWppYjIzOTJ0NzBwaTdnNDQ4a3ZqNDM1YWwuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNDQwNDIzNDIyNzItaHM0ZzU4cWppYjIzOTJ0NzBwaTdnNDQ4a3ZqNDM1YWwuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDU5NjkxNDEyNzYzOTYyMDU2NjciLCJlbWFpbCI6Im1vc2lrbm5AZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5iZiI6MTczNzc1MzYwMSwibmFtZSI6Ik1vc2lrYW5hbiBHbmFuYXNlZ2FyYW0iLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSWtsSmMydUx3WU9UYWRWYmthUWlMUGlpcmRhWkRzWk5Vekg0QmNlOXdIS25ZTXloZUk9czk2LWMiLCJnaXZlbl9uYW1lIjoiTW9zaWthbmFuIiwiZmFtaWx5X25hbWUiOiJHbmFuYXNlZ2FyYW0iLCJpYXQiOjE3Mzc3NTM5MDEsImV4cCI6MTczNzc1NzUwMSwianRpIjoiNjhjOTFhOWNhOTRmZjgxOTU1NzJjNzE1OThjZTUxZDg3M2Q3YTBkOSJ9.z8w2ycPwj1cLgBMvX-KhuVioVmWnoRyBrsf2ZY2ymm7bczrc-Kl1NIbk2CAqxJKgsQUC-WGPwWB9XiEsfet4_m23fY1F5o4BBVHF6DTgkdKN1HthyMG-bOyClrJlZQ1YqWJSCjKySWXMBHQJ58lfDA3ICuV2EoSPacDF_prjzKOWNbsAgAZJzTvE3l1qvbfx_l_zmBbFd3ROlVgQ03PqGCxiRXzieos7xr7CAKVs8EOoLfUpv8PFB1bj3UzHnGY6PUfJEZaNAwrRU0o0PgO-Lp79WDtMGDhl67UUdtQPxyK4ort9UXvI6_eB-dYS6pnbNuDVG9UmGK_IdRbazQtRUw');
+    // return
+    // const { access_token: accessToken, refresh_token: refreshToken } = tokens;
+    // console.log('tokens',payload);
+    getEmails()
+
+    return
+    
+    const { sub: googleId, email, name } = payload;
+
+    // Store user data in the database using Sequelize's `findOrCreate` method
+    const [user, created] = await User.findOrCreate({
+      where: { googleId }, // Check if the user exists by googleId
+      defaults: {
+        email,
+        name,
+        // accessToken, // Store the access token in the database
+        // refreshToken, // Store the refresh token in the database (optional)
+      },
+    });
+
+    
+
+    if (created) {
+      console.log('New user created:', user);
+    } else {
+      console.log('User already exists:', user);
+    }
+
+    // Proceed with further authentication logic here
+    res.status(200).json({ message: 'Login successful', response: payload });
+  } catch (error) {
+    console.error('Error during Google authentication:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
+  console.log('code',req.query)
   try {
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
@@ -130,18 +202,19 @@ const refreshAccessToken = async () => {
 
 // Function to connect to Gmail IMAP and fetch emails
 const getEmails = async () => {
-  let accessToken = process.env.ACCESS_TOKEN;
+  // let accessToken = process.env.ACCESS_TOKEN;
 
-  // Refresh token if needed
-  if (!accessToken) {
-    accessToken = await refreshAccessToken();
-  }
+  // // Refresh token if needed
+  // if (!accessToken) {
+  //   accessToken = await refreshAccessToken();
+  // }
 
   const imapConfig = {
     imap: {
       user: 'mosiknn@gmail.com',
+      scope: 'https://www.googleapis.com/auth/gmail.readonly',
       // password: 'Kannaplease123456789',
-      password: 'nsto ynnj bqpx xnit',
+      // password: 'nsto ynnj bqpx xnit',
       // xoauth2: Buffer.from(
       //   `user=mosiknn@gmail.com\x01auth=Bearer ${accessToken}\x01\x01`
       // ).toString('base64'),
@@ -168,32 +241,20 @@ const getEmails = async () => {
       })
       .then((messages) => {
         const emailData = messages.map((msg) => {
-          console.log('messgesss', msg);
-          const headers = msg.parts?.body || {};
-          // const headers = msg.parts.find((part) => part.which === 'HEADER.FIELDS (FROM TO SUBJECT DATE)');
-          console.log('messgesss morrrrs',msg.attributes.uid);
-
-          const attributes = msg.attributes;
-      
-          const emailData = {
-            emailId: attributes['x-gm-msgid'], // Use x-gm-msgid as a unique email ID
-            senderEmail: headers.from || 'Unknown Sender', // Extract sender email
-            senderName: headers.from || 'Unknown Sender', // Optionally split sender email to extract the name
-            subject: headers.subject || 'No Subject', // Extract subject
-            timestamp: '2012-10-21T08:59:28.000Z', // Use attributes.date for timestamp
-            snippet: headers.snippet || 'No Snippet', // If there's a snippet available
-            userId: null, // Set the appropriate userId if applicable
-          };
-      
-          // Save email to the database
-         Email.create(emailData);
-
+          const headers = msg.parts.find((part) => part.which === 'HEADER.FIELDS (FROM TO SUBJECT DATE)');
           
-        });
-        
- 
-        resolve(emailData);
+          const email = {
+            emailId: msg.attributes['x-gm-msgid'], // Unique Gmail message ID
+            senderEmail: headers.from || 'Unknown Sender', // Sender email
+            subject: headers.subject || 'No Subject', // Subject of the email
+            timestamp: headers.date || 'Unknown Date', // Timestamp
+          };
 
+          // Save email to DB
+          Email.create(email); // Assuming Email is a Sequelize model
+        });
+
+        resolve(emailData);
       })
       .catch((err) => {
         console.error('IMAP Connection Error:', err);
